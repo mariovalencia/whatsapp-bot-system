@@ -2,41 +2,57 @@ from django.db import models
 from django.contrib.auth.models import User
 
 class Role(models.Model):
-    """Modelo para roles de usuario"""
-    name = models.CharField(max_length=50, unique=True)
+    """Modelo para gestionar roles de usuario"""
+    ROLE_CHOICES = [
+        ('admin', 'Administrador'),
+        ('supervisor', 'Supervisor'),
+        ('tech', 'Técnico'),
+    ]
+    
+    name = models.CharField(max_length=20, choices=ROLE_CHOICES, unique=True)
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.name
+    updated_at = models.DateTimeField(auto_now=True)
     
-class UserProfile(models.Model):
-    """Perfil extendido de usuario"""
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True)
-    phone = models.CharField(max_length=20, blank=True)
-    is_active_agent = models.BooleanField(default=False)
-    last_login_ip = models.GenericIPAddressField(null=True, blank=True)
-
     def __str__(self):
-        return f"{self.user.username}'s profile"
-    
-class Permission(models.Model):
-    """Permisos especificos del sistema"""
-    code = models.CharField(max_length=50, unique=True)
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True)
+        return self.get_name_display()
 
-    def __str__(self):
-        return self.name
+class UserRole(models.Model):
+    """Asignación de roles a usuarios"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='user_roles')
+    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name='user_roles')
+    created_at = models.DateTimeField(auto_now_add=True)
     
-class RolePermission(models.Model):
-    """Relacion entre roles y permisos"""
-    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name='permissions')
-    permission = models.ForeignKey(Permission, on_delete=models.CASCADE)
-
     class Meta:
-        unique_together = ('role','permission')
-
+        unique_together = ('user', 'role')
+    
     def __str__(self):
-        return f"{self.role.name} - {self.permission.name}"
+        return f"{self.user.username} - {self.role.get_name_display()}"
+
+class Permission(models.Model):
+    """Permisos específicos del sistema"""
+    PERMISSION_CHOICES = [
+        ('manage_users', 'Gestionar usuarios'),
+        ('manage_bot', 'Gestionar configuración del bot'),
+        ('answer_chats', 'Responder conversaciones'),
+        ('view_reports', 'Ver reportes'),
+        ('manage_whatsapp', 'Gestionar conexión WhatsApp'),
+    ]
+    
+    name = models.CharField(max_length=50, choices=PERMISSION_CHOICES, unique=True)
+    description = models.TextField(blank=True)
+    
+    def __str__(self):
+        return self.get_name_display()
+
+class RolePermission(models.Model):
+    """Asignación de permisos a roles"""
+    role = models.ForeignKey(Role, on_delete=models.CASCADE, related_name='role_permissions')
+    permission = models.ForeignKey(Permission, on_delete=models.CASCADE, related_name='role_permissions')
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('role', 'permission')
+    
+    def __str__(self):
+        return f"{self.role.get_name_display()} - {self.permission.get_name_display()}"
