@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  # Servicio de base de datos de postgreSQL
+  postgres:
+    image: postgres:14
+    container_name: whatsapp_bot_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_data:/var/lib/postgresql/postgres_data
+    ports:
+      - "5432:5432"
+    networks:
+      - whatsapp_bot_network
+    restart: unless-stopped
+
+  # Servicio de backend Django
+  backend:
+    build: ./backend
+    container_name: whatsapp_bot_backend
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn core.wsgi:application --bind 0.0.0.0:8000"
+    volumes:
+      - ./backend:/app
+      - static_files:/app/static
+      - media_files:/app/media
+    depends_on:
+      - postgres
+    environment:
+      - DEBUG=${DEBUG}
+      - SECRET_KEY=${SECRET_KEY}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+    networks:
+      - whatsapp_bot_network
+    restart: unless-stopped
+  
+  #Servicio de bot de WhatsApp
+  bot:
+    build: ./bot
+    container_name: whatsapp_bot_service
+    command: python app.py
+    volumes:
+      - ./bot:/app
+      - whatsapp_session:/app/session
+    depends_on:
+      - backend
+    environment:
+      - API_URL=http://backend:8000/api
+      - API_TOKEN=${BOT_API_TOKEN}
+    networks:
+      - whatsapp_bot_network
+    restart: unless-stopped
+
+  # Servicio de frontend React
+  frontend:
+    build: ./frontend
+    container_name: whatsapp_bot_frontend
+    volumes:
+      - ./frontend
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - whatsapp_bot_network
+    ports:
+      - "3000:3000"
+
+  # Servidor web Nginx (para producción)
+  nginx:
+    build: ./nginx
+    container_name: whatsapp_bot_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - static_files:/var/www/static
+      - media_files:/var/www/media
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - whatsapp_bot_network
+    restart: unless-stopped
+
+networks:
+  whatsapp_bot_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  static_files:
+  media_files:
+  whatsapp_session:
