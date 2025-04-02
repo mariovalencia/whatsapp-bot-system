@@ -1,232 +1,206 @@
-# bot/app.py
+"""
+Aplicación principal del bot de WhatsApp.
+Este archivo sirve como punto de entrada para el servicio del bot.
+"""
 import os
+import sys
 import time
-import logging
-import requests
 import json
-from datetime import datetime
-from wppconnect import WPPConnect
+import requests
+import logging
+from dotenv import load_dotenv
+from flask import Flask, request, jsonify
+from wppconnect import Wppconnect
+from threading import Thread
 
-# Configuración de logging
+# Configurar logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('whatsapp_bot')
 
-# Configuración del bot
+# Cargar variables de entorno
+load_dotenv()
+
+# Configuración de la API
 API_URL = os.getenv('API_URL', 'http://localhost:8000/api')
-API_TOKEN = os.getenv('API_TOKEN', 'your_api_token')
-SESSION_ID = os.getenv('SESSION_ID', 'whatsapp-bot-main')
-SESSION_PATH = os.path.join('session', SESSION_ID)
+API_TOKEN = os.getenv('API_TOKEN', '')
 
-class WhatsAppBot:
-    def __init__(self):
-        self.client = None
-        self.session_id = SESSION_ID
-        self.session_path = SESSION_PATH
-        self.api_url = API_URL
-        self.api_token = API_TOKEN
-        self.headers = {
-            'Authorization': f'Bearer {self.api_token}',
+# Inicializar Flask para endpoints de administración del bot
+app = Flask(__name__)
+
+# Variable global para mantener la instancia de WPPConnect
+wpp_instance = None
+is_connected = False
+
+def create_session(session_id="default_session"):
+    """Crear y devolver una nueva instancia de WPPConnect"""
+    global wpp_instance, is_connected
+    
+    # Crear directorio de sesión si no existe
+    session_dir = os.path.join(os.path.dirname(__file__), 'session')
+    if not os.path.exists(session_dir):
+        os.makedirs(session_dir)
+    
+    # Crear instancia de WPPConnect
+    wpp_instance = Wppconnect(session=session_id, session_path=session_dir)
+    
+    try:
+        # Conectar a WhatsApp
+        logger.info(f"Iniciando sesión: {session_id}")
+        wpp_instance.connect()
+        
+        # Configurar manejador de mensajes
+        @wpp_instance.on_message
+        def handle_message(message):
+            if not message.get('fromMe', False):  # Ignorar mensajes propios
+                process_incoming_message(message)
+        
+        # Verificar si la conexión fue exitosa
+        max_attempts = 30
+        for _ in range(max_attempts):
+            if wpp_instance.is_logged():
+                is_connected = True
+                logger.info("Conexión exitosa a WhatsApp")
+                break
+            time.sleep(1)
+        
+        if not is_connected:
+            logger.error("No se pudo conectar a WhatsApp")
+            return False
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error al crear sesión: {e}")
+        return False
+
+def process_incoming_message(message):
+    """Procesar mensajes entrantes y enviar a la API backend"""
+    try:
+        # Ignorar mensajes de grupos por ahora
+        if message.get('isGroupMsg', False):
+            return
+        
+        phone = message.get('from', '').split('@')[0]  # Extraer número de teléfono
+        content = message.get('body', '')
+        message_id = message.get('id', '')
+        
+        logger.info(f"Mensaje recibido de {phone}: {content[:50]}...")
+        
+        # Enviar el mensaje al backend para procesamiento
+        payload = {
+            'phone': phone,
+            'content': content,
+            'message_id': message_id,
+            'type': 'incoming'
+        }
+        
+        headers = {
+            'Authorization': f'Token {API_TOKEN}',
             'Content-Type': 'application/json'
         }
-        self.active_conversations = {}
-        self.knowledge_base = {}
-        self.load_knowledge_base()
         
-    def load_knowledge_base(self):
-        """Carga la base de conocimientos desde la API"""
+        response = requests.post(
+            f"{API_URL}/messages/", 
+            json=payload,
+            headers=headers
+        )
+        
+        if response.status_code != 201:
+            logger.error(f"Error al enviar mensaje a backend: {response.status_code}")
+            logger.error(response.text)
+        
+    except Exception as e:
+        logger.error(f"Error al procesar mensaje: {e}")
+
+def send_message(phone, content):
+    """Enviar mensaje a un número de teléfono"""
+    global wpp_instance, is_connected
+    
+    if not is_connected or not wpp_instance:
+        logger.error("No hay conexión activa a WhatsApp")
+        return False
+    
+    try:
+        # Añadir sufijo @c.us si no está presente
+        if '@' not in phone:
+            phone = f"{phone}@c.us"
+        
+        # Enviar mensaje
+        result = wpp_instance.send_message(phone, content)
+        logger.info(f"Mensaje enviado a {phone}: {content[:50]}...")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error al enviar mensaje: {e}")
+        return False
+
+# Endpoints de la API Flask para administración
+@app.route('/status', methods=['GET'])
+def status():
+    """Verificar el estado de la conexión"""
+    global is_connected
+    return jsonify({
+        'status': 'connected' if is_connected else 'disconnected',
+    })
+
+@app.route('/send', methods=['POST'])
+def api_send_message():
+    """Endpoint para enviar mensajes"""
+    data = request.json
+    phone = data.get('phone')
+    content = data.get('content')
+    
+    if not phone or not content:
+        return jsonify({'error': 'Se requieren phone y content'}), 400
+    
+    result = send_message(phone, content)
+    
+    if result:
+        return jsonify({'status': 'success'}), 200
+    else:
+        return jsonify({'status': 'error', 'message': 'No se pudo enviar el mensaje'}), 500
+
+@app.route('/reconnect', methods=['POST'])
+def reconnect():
+    """Reiniciar la conexión con WhatsApp"""
+    global wpp_instance, is_connected
+    
+    # Cerrar conexión existente si la hay
+    if wpp_instance:
         try:
-            response = requests.get(f"{self.api_url}/questions/", headers=self.headers)
-            if response.status_code == 200:
-                data = response.json()
-                # Procesar datos para búsqueda rápida
-                self.knowledge_base = {
-                    'questions': {qa['id']: qa for qa in data},
-                    'keywords': {}
-                }
-                
-                for qa in data:
-                    if qa['keywords']:
-                        keywords = [kw.strip().lower() for kw in qa['keywords'].split(',')]
-                        for kw in keywords:
-                            if kw not in self.knowledge_base['keywords']:
-                                self.knowledge_base['keywords'][kw] = []
-                            self.knowledge_base['keywords'][kw].append(qa['id'])
-                
-                logger.info(f"Loaded {len(data)} questions into knowledge base")
-            else:
-                logger.error(f"Failed to load knowledge base: {response.status_code} - {response.text}")
-        except Exception as e:
-            logger.error(f"Error loading knowledge base: {e}")
+            wpp_instance.close()
+        except:
+            pass
+        wpp_instance = None
+        is_connected = False
     
-    def find_best_answer(self, message_text):
-        """Busca la mejor respuesta para un mensaje dado"""
-        # Implementación simple - buscar coincidencias de palabras clave
-        message_text = message_text.lower()
-        
-        # Buscar coincidencia exacta en preguntas
-        for qa_id, qa in self.knowledge_base['questions'].items():
-            if message_text in qa['question'].lower():
-                return qa['answer']
-        
-        # Buscar palabras clave
-        matched_qa_ids = []
-        for word in message_text.split():
-            if word in self.knowledge_base['keywords']:
-                matched_qa_ids.extend(self.knowledge_base['keywords'][word])
-        
-        if matched_qa_ids:
-            # Contar cuántas veces aparece cada ID (más coincidencias = mejor match)
-            from collections import Counter
-            count = Counter(matched_qa_ids)
-            best_match_id = count.most_common(1)[0][0]
-            return self.knowledge_base['questions'][best_match_id]['answer']
-        
-        # Respuesta por defecto si no hay coincidencias
-        return "Lo siento, no tengo una respuesta para esa pregunta. ¿Puedo ayudarte con algo más?"
+    # Crear nueva sesión
+    success = create_session()
     
-    def register_contact(self, phone):
-        """Registra un nuevo contacto en la API"""
-        try:
-            # Verificar si ya existe
-            response = requests.get(f"{self.api_url}/contacts/?phone={phone}", headers=self.headers)
-            if response.status_code == 200:
-                data = response.json()
-                if data:
-                    return data[0]['id']
-            
-            # Crear nuevo contacto
-            contact_data = {
-                'phone': phone,
-                'name': phone  # Usamos el teléfono como nombre inicial
-            }
-            response = requests.post(f"{self.api_url}/contacts/", json=contact_data, headers=self.headers)
-            if response.status_code == 201:
-                return response.json()['id']
-            else:
-                logger.error(f"Failed to create contact: {response.status_code} - {response.text}")
-                return None
-        except Exception as e:
-            logger.error(f"Error registering contact: {e}")
-            return None
+    if success:
+        return jsonify({'status': 'success', 'message': 'Reconectado correctamente'}), 200
+    else:
+        return jsonify({'status': 'error', 'message': 'No se pudo reconectar'}), 500
+
+def main():
+    """Función principal para iniciar el bot"""
+    # Iniciar conexión con WhatsApp
+    success = create_session()
     
-    def create_or_get_conversation(self, contact_id):
-        """Crea o recupera una conversación activa"""
-        try:
-            # Buscar conversación activa
-            response = requests.get(
-                f"{self.api_url}/conversations/?contact={contact_id}&is_active=true", 
-                headers=self.headers
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data:
-                    return data[0]['id']
-            
-            # Crear nueva conversación
-            conversation_data = {
-                'contact': contact_id,
-                'is_active': True,
-                'bot_mode': True
-            }
-            response = requests.post(
-                f"{self.api_url}/conversations/", 
-                json=conversation_data, 
-                headers=self.headers
-            )
-            
-            if response.status_code == 201:
-                return response.json()['id']
-            else:
-                logger.error(f"Failed to create conversation: {response.status_code} - {response.text}")
-                return None
-        except Exception as e:
-            logger.error(f"Error creating conversation: {e}")
-            return None
+    if not success:
+        logger.error("No se pudo iniciar el bot. Saliendo.")
+        sys.exit(1)
     
-    def save_message(self, conversation_id, content, msg_type='incoming', from_bot=False):
-        """Guarda un mensaje en la API"""
-        try:
-            message_data = {
-                'conversation': conversation_id,
-                'content': content,
-                'type': msg_type,
-                'is_from_bot': from_bot
-            }
-            response = requests.post(
-                f"{self.api_url}/conversations/{conversation_id}/send_message/", 
-                json=message_data, 
-                headers=self.headers
-            )
-            
-            if response.status_code != 200 and response.status_code != 201:
-                logger.error(f"Failed to save message: {response.status_code} - {response.text}")
-        except Exception as e:
-            logger.error(f"Error saving message: {e}")
+    # Iniciar servidor Flask en un hilo separado
+    host = '0.0.0.0'
+    port = 5000
+    logger.info(f"Iniciando servidor en {host}:{port}")
     
-    def on_message(self, message):
-        """Manejador de mensajes entrantes"""
-        try:
-            # Solo procesamos mensajes de texto por ahora
-            if message.get('type') != 'chat':
-                return
-            
-            # Extraer información del mensaje
-            content = message.get('content', '')
-            from_number = message.get('from', '').split('@')[0]
-            
-            logger.info(f"Message received from {from_number}: {content}")
-            
-            # Registrar contacto y crear/obtener conversación
-            contact_id = self.register_contact(from_number)
-            if not contact_id:
-                logger.error(f"Could not register contact for {from_number}")
-                return
-            
-            conversation_id = self.create_or_get_conversation(contact_id)
-            if not conversation_id:
-                logger.error(f"Could not create conversation for {from_number}")
-                return
-            
-            # Guardar mensaje recibido
-            self.save_message(conversation_id, content, 'incoming', False)
-            
-            # Verificar si la conversación está en modo bot
-            response = requests.get(
-                f"{self.api_url}/conversations/{conversation_id}/", 
-                headers=self.headers
-            )
-            
-            if response.status_code == 200:
-                conversation = response.json()
-                if not conversation.get('bot_mode', True):
-                    # Conversación asignada a un agente, no respondemos automáticamente
-                    logger.info(f"Conversation {conversation_id} is handled by an agent")
-                    return
-            
-            # Buscar respuesta en la base de conocimientos
-            answer = self.find_best_answer(content)
-            
-            # Enviar respuesta
-            self.client.send_message(message['from'], answer)
-            
-            # Guardar respuesta
-            self.save_message(conversation_id, answer, 'outgoing', True)
-            
-        except Exception as e:
-            logger.error(f"Error processing message: {e}")
-    
-    def update_session_info(self, session, is_active, qr_code=None):
-        """Actualiza la información de la sesión en la API"""
-        data = {'is_active': is_active}
-        
-        if qr_code:
-            data['last_qr_code'] = qr_code
-            data['qr_generated_at'] = datetime.now().isoformat()
-        elif is_active:
-            data['connected_at'] = datetime.now().isoformat()
-        else:
-            data['disconnected_at'] = datetime.now().iso
+    from waitress import serve
+    serve(app, host=host, port=port)
+
+if __name__ == "__main__":
+    main()
