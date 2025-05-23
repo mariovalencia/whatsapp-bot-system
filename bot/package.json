@@ -1,0 +1,14 @@
+{
+  "name": "whatsapp-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp Bot for customer service",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "venom-bot": "^4.3.7",
+    "axios": "^1.4.0",
+    "dotenv": "^16.3.1"
+  }
+}

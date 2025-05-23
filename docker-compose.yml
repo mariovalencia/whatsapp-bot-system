@@ -1,0 +1,84 @@
+
+services:
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql  # Monta el script SQL
+    ports:
+      - "5432:5432"
+    networks:
+      - bot-network
+
+  backend:
+    env_file: .env
+    build: ./backend
+    command: sh -c "while ! nc -z db 5432; do sleep 1; done && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./backend:/app
+    environment:
+      DB_HOST: db
+      DB_NAME: ${DJANGO_DB_NAME}
+      DB_USER: ${DJANGO_DB_USER}
+      DB_PASSWORD: ${DJANGO_DB_PASSWORD}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    networks:
+      - bot-network
+
+  frontend:
+    build: ./frontend
+    command: sh -c "npm install && npm run dev"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - bot-network
+
+  bot:
+    build: ./bot
+    env_file: .env 
+    environment:
+      DB_HOST: db
+      DB_NAME: ${BOT_DB_NAME}
+      DB_USER: ${BOT_DB_USER}
+      DB_PASSWORD: ${BOT_DB_PASSWORD}
+    command: sh -c "npm install && node index.js"
+    volumes:
+      - ./bot:/app
+      - /app/node_modules
+      - ./bot/sessions:/app/sessions
+    ports:
+      - "3001:3001"
+    depends_on:
+      - backend
+    networks:
+      - bot-network
+
+  nginx:
+    build: ./nginx
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+      - frontend
+      - bot
+    networks:
+      - bot-network
+
+volumes:
+  postgres_data:
+
+networks:
+  bot-network:
+    driver: bridge
