@@ -7,3 +7,6 @@ class User(AbstractUser):
     
     def __str__(self):
         return self.email
+    
+    def has_perm(self, perm_code):
+        return self.userrole_set.filter(role__rolepermission__permission__code=perm_code).exists()

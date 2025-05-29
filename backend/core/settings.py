@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from datetime import timedelta
 
 load_dotenv()
 
@@ -35,30 +36,59 @@ ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split('
 # Application definition
 
 INSTALLED_APPS = [
+    
+    # Django Core
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
+    
+    # 3rd party
     'rest_framework',
+    'rest_framework.authtoken',
     'rest_framework_simplejwt',
+    
+    # Allauth
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    
+    # dj-rest-auth
+    'dj_rest_auth',
+    'dj_rest_auth.registration',
+    
+    # Otros
     'drf_spectacular',
+    'corsheaders',
+    
+    # Mis Apps
     'authentication',
     'security',
     'bot_management',          
     'whatsapp_integration',    
     'api',
+        
 ]
+
+SITE_ID = 1
+
+CORS_ALLOW_ALL_ORIGINS = True  # Solo para desarrollo
+CORS_ALLOW_CREDENTIALS = True
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -144,7 +174,12 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'AUTH_HEADER_TYPES': ('Bearer',),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    'AUTH_HEADER_TYPES': ('Bearer', 'JWT'),
 }
 
 SPECTACULAR_SETTINGS = {
@@ -153,3 +188,53 @@ SPECTACULAR_SETTINGS = {
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
 }
+
+# Configuración de Google
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': os.getenv('GOOGLE_CLIENT_ID'),
+            'secret': os.getenv('GOOGLE_CLIENT_SECRET'),
+            'key': ''
+        },
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'access_type': 'online'},
+    }
+}
+
+# URLs necesarias
+LOGIN_REDIRECT_URL = '/'
+ACCOUNT_LOGOUT_ON_GET = True
+
+
+
+# Autenticación backends
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+# Configuración de allauth
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # Temporal para desarrollo
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_UNIQUE_EMAIL = True
+ACCOUNT_USERNAME_REQUIRED = False
+
+# Configuración de dj-rest-auth
+REST_AUTH = {
+    'USE_JWT': True,
+    'JWT_AUTH_COOKIE': 'access',
+    'JWT_AUTH_REFRESH_COOKIE': 'refresh',
+    'JWT_AUTH_HTTPONLY': False,
+    'SESSION_LOGIN': False,
+    'OLD_PASSWORD_FIELD_ENABLED': True,
+}
+
+SOCIALACCOUNT_ADAPTER = 'authentication.pipeline.assign_default_role'
+
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://frontend:5173"
+]
