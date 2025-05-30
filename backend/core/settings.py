@@ -195,10 +195,11 @@ SOCIALACCOUNT_PROVIDERS = {
         'APP': {
             'client_id': os.getenv('GOOGLE_CLIENT_ID'),
             'secret': os.getenv('GOOGLE_CLIENT_SECRET'),
-            'key': ''
+            #'key': ''
         },
         'SCOPE': ['profile', 'email'],
         'AUTH_PARAMS': {'access_type': 'online'},
+        #'OAUTH_PKCE_ENABLED': False,
     }
 }
 
@@ -210,16 +211,20 @@ ACCOUNT_LOGOUT_ON_GET = True
 
 # Autenticación backends
 AUTHENTICATION_BACKENDS = [
-    'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
+    'django.contrib.auth.backends.ModelBackend',
 ]
 
 # Configuración de allauth
-ACCOUNT_EMAIL_VERIFICATION = 'none'  # Temporal para desarrollo
-ACCOUNT_AUTHENTICATION_METHOD = 'email'
+SOCIALACCOUNT_AUTO_SIGNUP = True
 ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_VERIFICATION = 'none'  # Temporal para desarrollo
+#ACCOUNT_UNIQUE_EMAIL = True
+
+# Restringe los dominios de correo si es necesario (opcional)
+ACCOUNT_ADAPTER = 'authentication.adapters.CustomAccountAdapter'
 
 # Configuración de dj-rest-auth
 REST_AUTH = {
@@ -238,3 +243,18 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://frontend:5173"
 ]
+
+# Logging
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'DEBUG',
+    },
+}

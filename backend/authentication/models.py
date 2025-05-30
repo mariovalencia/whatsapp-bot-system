@@ -6,7 +6,9 @@ class User(AbstractUser):
     is_verified = models.BooleanField(default=False)
     
     def __str__(self):
-        return self.email
+        return self.email or self.username
     
-    def has_perm(self, perm_code):
-        return self.userrole_set.filter(role__rolepermission__permission__code=perm_code).exists()
+    def has_perm(self, perm, obj=None):
+        if self.is_superuser:
+            return True
+        return self.userrole_set.filter(role__rolepermission__permission__code=perm).exists()

@@ -2,6 +2,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from .models import User
 from security.models import UserRole, RolePermission
+from django.contrib.auth import get_user_model
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -33,3 +34,20 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
         data['user'] = UserSerializer(self.user).data
         return data
+    
+User = get_user_model()
+
+class UserCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('email', 'first_name', 'last_name')
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            email=validated_data['email'],
+            first_name=validated_data.get('first_name', ''),
+            last_name=validated_data.get('last_name', ''),
+            password=None  # Sin contraseña para login solo con Google
+        )
+        return user
