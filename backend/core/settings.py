@@ -80,9 +80,9 @@ CORS_ALLOW_ALL_ORIGINS = True  # Solo para desarrollo
 CORS_ALLOW_CREDENTIALS = True
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -224,7 +224,11 @@ ACCOUNT_EMAIL_VERIFICATION = 'none'  # Temporal para desarrollo
 #ACCOUNT_UNIQUE_EMAIL = True
 
 # Restringe los dominios de correo si es necesario (opcional)
-ACCOUNT_ADAPTER = 'authentication.adapters.CustomAccountAdapter'
+#ACCOUNT_ADAPTER = 'authentication.adapters.CustomAccountAdapter'
+#SOCIALACCOUNT_ADAPTER = 'authentication.pipeline.assign_default_role'
+
+ACCOUNT_ADAPTER = 'allauth.account.adapter.DefaultAccountAdapter'
+SOCIALACCOUNT_ADAPTER = 'allauth.socialaccount.adapter.DefaultSocialAccountAdapter'
 
 # Configuración de dj-rest-auth
 REST_AUTH = {
@@ -236,13 +240,13 @@ REST_AUTH = {
     'OLD_PASSWORD_FIELD_ENABLED': True,
 }
 
-SOCIALACCOUNT_ADAPTER = 'authentication.pipeline.assign_default_role'
 
-CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://frontend:5173"
 ]
+
+CORS_ALLOW_CREDENTIALS = True
 
 # Logging
 LOGGING = {

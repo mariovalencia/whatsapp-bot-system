@@ -11,15 +11,22 @@ const Login = () => {
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
+      console.log(credentialResponse);
+
       const { data } = await axios.post(
       `${import.meta.env.VITE_API_BASE_URL}/auth/google/`,
       { token: credentialResponse.credential },
-      { withCredentials: true }
+      {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        //{ withCredentials: true }
+      }
     );
       localStorage.setItem('token', data.access)
       window.location.href = '/dashboard';
     } catch (error) {
-      console.error('Google login failed:', error)
+      console.error('Google login failed:', error.response?.data || error.message)
       alert('Error al iniciar sesión con Google');
     }
   }
@@ -31,7 +38,7 @@ const Login = () => {
       localStorage.setItem('token', data.access)
       window.location.href = '/dashboard'; 
     } catch (error) {
-      console.error('Login failed:', error)
+      console.error('Login failed:', error.response?.data || error.message)
     }
   }
 
