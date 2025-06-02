@@ -246,6 +246,11 @@ CORS_ALLOWED_ORIGINS = [
     "http://frontend:5173"
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://frontend:5173"
+]
+
 CORS_ALLOW_CREDENTIALS = True
 
 # Logging

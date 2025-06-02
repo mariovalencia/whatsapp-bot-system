@@ -18,22 +18,50 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
         token['is_verified'] = user.is_verified
         
          # Roles y permisos del usuario
-        roles = UserRole.objects.filter(user=user).select_related('role')
-        token['roles'] = [user_role.role.name for user_role in roles]
+        # Para superusers, asignar todos los permisos
+        if user.is_superuser:
+            token['roles'] = ['superuser']
+            token['permissions'] = ['*']  # Wildcard para todos los permisos
+        else:
+            roles = UserRole.objects.filter(user=user).select_related('role')
+            token['roles'] = [user_role.role.name for user_role in roles]
         
-        # Permisos únicos (evitando duplicados si un rol tiene múltiples permisos)
-        permissions = set()
-        for role in roles:
-            perms = RolePermission.objects.filter(role=role.role).select_related('permission')
-            permissions.update([perm.permission.code for perm in perms])
-        token['permissions'] = list(permissions)
+            # Permisos únicos (evitando duplicados si un rol tiene múltiples permisos)
+            permissions = set()
+            for role in roles:
+                perms = RolePermission.objects.filter(role=role.role).select_related('permission')
+                permissions.update([perm.permission.code for perm in perms])
+            token['permissions'] = list(permissions)
         
         return token
 
     def validate(self, attrs):
+        print("Datos recibidos:", attrs)
+        # Asegúrate que los campos coincidan con el frontend
+        username = attrs.get('username')
+        password = attrs.get('password')
+        
+        # Esta línea genera el access y refresh token
         data = super().validate(attrs)
-        data['user'] = UserSerializer(self.user).data
-        return data
+
+        if not username or not password:
+            raise serializers.ValidationError("Se requieren email y contraseña")
+        # Asegurarnos de mapear correctamente las claves del token
+        response_data = {
+            'access': data['access'],  # <-- Clave crítica que espera el frontend
+            'refresh': data['refresh'],
+            'user': UserSerializer(self.user).data,
+            'roles': ['superuser'] if self.user.is_superuser else [
+                ur.role.name for ur in UserRole.objects.filter(user=self.user)
+            ],
+            'permissions': ['*'] if self.user.is_superuser else list(set(
+                perm.permission.code 
+                for role in UserRole.objects.filter(user=self.user).select_related('role')
+                for perm in RolePermission.objects.filter(role=role.role)
+            ))
+        }
+        
+        return response_data
     
 User = get_user_model()
 

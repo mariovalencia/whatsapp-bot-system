@@ -19,6 +19,34 @@ from security.decorators import permission_required
 
 class MyTokenObtainPairView(TokenObtainPairView):
     serializer_class = MyTokenObtainPairSerializer
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        
+        if response.status_code == 200:
+            # Obtener el usuario del serializer después de la autenticación
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            user = serializer.user
+            
+            # Asegúrate que todos los datos sean serializables
+            roles = list(user.userrole_set.values_list('role__name', flat=True)) if hasattr(user, 'userrole_set') else []
+            
+            # Obtener permisos de forma serializable
+            permissions = []
+            if hasattr(user, 'userrole_set'):
+                for role in user.userrole_set.all():
+                    perms = role.role.rolepermission_set.values_list('permission__code', flat=True)
+                    permissions.extend(list(perms))
+
+            # Estructura estándar que espera el frontend
+            response.data = {
+                'access': response.data.get('access'),
+                'refresh': response.data.get('refresh'),
+                'user': UserSerializer(user).data,
+                'roles': roles,  # Tus roles
+                'permissions': list(set(permissions))  # Tus permisos
+            }
+        return response
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -43,7 +71,7 @@ User = get_user_model()
 
 class GoogleAuthTokenView(APIView):
     def post(self, request):
-        token = request.data.get('token')
+        token = request.data.get('access_token')
         if not token:
             return Response({"error": "Token requerido"}, status=400)
 

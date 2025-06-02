@@ -15,18 +15,19 @@ const Login = () => {
 
       const { data } = await axios.post(
       `${import.meta.env.VITE_API_BASE_URL}/auth/google/`,
-      { token: credentialResponse.credential },
+      { access_token: credentialResponse.credential },
       {
         headers: {
           'Content-Type': 'application/json',
+          withCredentials: true
         },
-        //{ withCredentials: true }
+        
       }
     );
-      localStorage.setItem('token', data.access)
+      localStorage.setItem('token', response.data.access)
       window.location.href = '/dashboard';
     } catch (error) {
-      console.error('Google login failed:', error.response?.data || error.message)
+      console.error('Google login failed:', error.response?.data || error.message);
       alert('Error al iniciar sesión con Google');
     }
   }
@@ -34,11 +35,21 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const { data } = await login({ email, password })
+      const { data } = await login({ 
+        username: email,
+        password: password 
+      });
       localStorage.setItem('token', data.access)
       window.location.href = '/dashboard'; 
     } catch (error) {
-      console.error('Login failed:', error.response?.data || error.message)
+      const errorMessage = error.response?.data?.detail || 
+                       error.response?.data?.non_field_errors?.[0] || 
+                       'Error al iniciar sesión';
+      console.error('Error completo:', {
+        message: errorMessage,
+        response: error.response?.data
+      });
+      alert(errorMessage);
     }
   }
 
