@@ -19,12 +19,11 @@ const Login = () => {
       {
         headers: {
           'Content-Type': 'application/json',
-          withCredentials: true
         },
-        
+        withCredentials: true
       }
     );
-      localStorage.setItem('token', response.data.access)
+      localStorage.setItem('token', data.access)
       window.location.href = '/dashboard';
     } catch (error) {
       console.error('Google login failed:', error.response?.data || error.message);

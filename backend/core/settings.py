@@ -81,6 +81,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -243,15 +244,14 @@ REST_AUTH = {
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
-    "http://frontend:5173"
+    "http://127.0.0.1:5173"
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
-    "http://frontend:5173"
+    "http://127.0.0.1:5173"
 ]
 
-CORS_ALLOW_CREDENTIALS = True
 
 # Logging
 LOGGING = {
@@ -267,3 +267,4 @@ LOGGING = {
         'level': 'DEBUG',
     },
 }
+
