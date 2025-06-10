@@ -43,7 +43,14 @@ venom
   .create({
     session: 'customer-service-bot',
     multidevice: true,
-    headless: true,
+    headless: false,
+    puppeteerOptions: {
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--single-process'  // Añade esta línea
+  ]},
     folderNameToken: 'tokens', // Carpeta para almacenar tokens
     disableWelcome: false,
     logQR: true, // Muestra QR en consola
