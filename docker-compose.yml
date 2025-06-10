@@ -50,8 +50,8 @@ services:
       - bot-network
 
   bot:
+    env_file: .env
     build: ./bot
-    env_file: .env 
     environment:
       DB_HOST: db
       DB_NAME: ${BOT_DB_NAME}

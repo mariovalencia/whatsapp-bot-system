@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Button, Modal, Form, Input, message } from 'antd';
+import { Table, Button, Modal, Form, Input, message, Tabs } from 'antd';
+import ResponseManager from './ResponseManager';
 import api from '../../services/api';
+const { TabPane } = Tabs;
 
 const IntentManager = () => {
   const [intents, setIntents] = useState([]);
@@ -78,28 +80,56 @@ const IntentManager = () => {
           form.resetFields();
         }}
         onOk={() => form.submit()}
+        width={800}  // Aumenta el ancho para acomodar las pestañas
+        footer={[
+          <Button key="cancel" onClick={() => {
+            setIsModalVisible(false);
+            form.resetFields();
+          }}>
+            Cancelar
+          </Button>,
+          <Button key="save" type="primary" onClick={() => form.submit()}>
+            Guardar
+          </Button>,
+        ]}
       >
-        <Form form={form} onFinish={handleSubmit}>
-          <Form.Item name="id" hidden>
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="name"
-            label="Nombre"
-            rules={[{ required: true }]}
+        <Tabs defaultActiveKey="config">
+          {/* Pestaña de Configuración (tu formulario actual) */}
+          <TabPane tab="Configuración" key="config">
+            <Form form={form} onFinish={handleSubmit} layout="vertical">
+              <Form.Item name="id" hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item
+                name="name"
+                label="Nombre"
+                rules={[{ required: true }]}
+              >
+                <Input />
+              </Form.Item>
+              <Form.Item
+                name="training_phrases"
+                label="Frases de Entrenamiento"
+              >
+                <Input.TextArea 
+                  placeholder="Ingresa frases separadas por comas" 
+                  autoSize={{ minRows: 3, maxRows: 6 }}
+                />
+              </Form.Item>
+            </Form>
+          </TabPane>
+
+          {/* Pestaña de Respuestas (nuevo) */}
+          <TabPane 
+            tab="Respuestas" 
+            key="responses"
+            disabled={!form.getFieldValue('id')} // Deshabilitar si no hay intent creado
           >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="training_phrases"
-            label="Frases de Entrenamiento"
-          >
-            <Input.TextArea 
-              placeholder="Ingresa frases separadas por comas" 
-              autoSize={{ minRows: 3, maxRows: 6 }}
-            />
-          </Form.Item>
-        </Form>
+            {form.getFieldValue('id') && (
+              <ResponseManager intentId={form.getFieldValue('id')} />
+            )}
+          </TabPane>
+        </Tabs>
       </Modal>
     </div>
   );
