@@ -9,72 +9,79 @@ from .serializers import (
     AskResponseSerializer,
     IntentSerializer
 )
+from .nlp_engine import NLPEngine
+from django.http import JsonResponse
+from .exceptions import NLPModelNotTrainedError
+import logging
 
+logger = logging.getLogger('bot_management')
+
+nlp_engine = NLPEngine()
 class AskBotView(APIView):
-    """
-    Endpoint para interactuar con el bot
-    Ejemplo de request:
-    {
-        "message": "hola",
-        "context": {"user_type": "premium"}
-    }
-    """
     def post(self, request):
-        # Validar el request
         request_serializer = AskRequestSerializer(data=request.data)
         request_serializer.is_valid(raise_exception=True)
         
-        # Procesar mensaje
-        intent, confidence = self._find_intent(
-            request_serializer.validated_data['message']
-        )
+        message = request_serializer.validated_data['message']
+        context = request_serializer.validated_data.get('context', {})
         
-        # Obtener respuesta
-        response_text = self._get_response(
-            intent,
-            request_serializer.validated_data.get('context', {})
-        )
+        try:
+            logger.info(f"Procesando mensaje: '{message}'")
         
-        # Construir respuesta
-        response_data = {
-            "intent": IntentSerializer(intent).data if intent else None,
-            "response": response_text,
-            "confidence": float(confidence) if confidence else 0.0
-        }
-        
-        response_serializer = AskResponseSerializer(data=response_data)
-        response_serializer.is_valid(raise_exception=True)
-        
-        return Response(response_serializer.data)
-
-    def _find_intent(self, message):
-        """
-        Lógica simplificada de búsqueda de intención
-        Devuelve: (Intent, confidence_score)
-        """
-        message_lower = message.lower()
-        for intent in Intent.objects.all():
-            if message_lower in intent.training_phrases:
-                return intent, 0.9  # Simulamos un 90% de confianza
-        
-        return None, None
-
+            try:
+                # Predecir intención
+                intent_id, confidence = self.nlp_engine.predict_intent(message)
+                intent = Intent.objects.filter(id=intent_id).first()
+            except NLPModelNotTrainedError:
+                    logger.warning("Modelo no entrenado - usando respuesta por defecto")
+                    return Response({
+                        "response": "Estoy aprendiendo todavía, por favor intenta más tarde.",
+                        "confidence": 0.0
+                    })    
+            # Obtener respuesta (implementa esta función según tu lógica)
+            response_text = self._get_response(intent, context)
+            
+            response_data = {
+                "intent": intent.name if intent else None,
+                "response": response_text,
+                "confidence": float(confidence)
+            }
+            
+            logger.info(f"Respuesta generada para mensaje: '{message}'")
+            return Response(response_data)
+            
+        except Exception as e:
+            logger.error(f"Error procesando mensaje: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Ocurrió un error procesando tu mensaje"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
     def _get_response(self, intent, context):
+        # Implementa tu lógica para obtener respuestas
         if not intent:
-            return "Lo siento, no entendí tu mensaje"
+            logger.debug("No se encontró intención - usando respuesta por defecto")
+            return "No entendí tu mensaje. ¿Podrías reformularlo?"
         
-        # Buscar respuesta con contexto coincidente
+        # Buscar respuesta contextual
         if context:
             for response in intent.responses.all():
                 if response.conditions and all(
-                    item in context.items() 
-                    for item in response.conditions.items()
+                    context.get(k) == v 
+                    for k, v in response.conditions.items()
                 ):
+                    logger.debug("Usando respuesta contextual")
                     return response.text
         
-        # Buscar respuesta por defecto
+        # Respuesta por defecto
         default_response = intent.responses.filter(is_default=True).first()
-        return default_response.text if default_response else "No tengo una respuesta configurada"
+        if default_response:
+            logger.debug("Usando respuesta por defecto")
+            return default_response
+        
+        logger.warning(f"No hay respuesta configurada para la intención {intent.name}")
+        return "No tengo una respuesta configurada para esto."
+    
     
 class IntentManagementView(generics.ListCreateAPIView):
     queryset = Intent.objects.all()
@@ -117,3 +124,20 @@ class IntentUpsertView(APIView):
             IntentSerializer(intent).data,
             status=status.HTTP_201_CREATED if created else status.HTTP_200_OK
         )     
+
+class TrainNLPView(APIView):
+    def post(self, request):
+        try:
+            logger.info("Entrenamiento iniciado")
+            success = nlp_engine.train()
+            logger.info("Entrenamiento completado: %s", success)
+            return JsonResponse({
+                "status": "success" if success else "warning",
+                "message": "Modelo entrenado" if success else "No hay datos suficientes"
+            })
+        except Exception as e:
+            logger.error(f"Error en entrenamiento: {str(e)}", exc_info=True)
+            return JsonResponse({
+                "status": "error",
+                "message": str(e)
+            }, status=500)

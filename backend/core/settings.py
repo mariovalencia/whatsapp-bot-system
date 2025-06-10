@@ -264,7 +264,25 @@ LOGGING = {
     },
     'root': {
         'handlers': ['console'],
-        'level': 'DEBUG',
+        'level': 'INFO',
     },
 }
 
+# Configuración para logs
+LOGS_DIR = os.path.join(BASE_DIR, 'logs')
+os.makedirs(LOGS_DIR, exist_ok=True)
+
+# Ruta del directorio que contendrá el modelo
+NLP_MODEL_DIR = os.path.join(BASE_DIR, 'bot_management')
+NLP_MODEL_PATH = os.path.join(NLP_MODEL_DIR, 'intents_model.pkl')
+
+# Solo creamos el directorio, no el archivo
+os.makedirs(NLP_MODEL_DIR, exist_ok=True)
+
+# Celery Configuration
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'UTC'

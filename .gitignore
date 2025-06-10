@@ -38,6 +38,7 @@ dist/
 
 # Sessions
 bot/sessions/
+bot/tokens/
 
 # Environment
 .env

@@ -19,7 +19,10 @@ services:
     build: ./backend
     command: sh -c "while ! nc -z db 5432; do sleep 1; done && python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     volumes:
+      - ./backend/logs:/app/backend/logs:rw
+      - ./backend/models:/app/backend/models
       - ./backend:/app
+    #user: "1000:1000"
     environment:
       DB_HOST: db
       DB_NAME: ${DJANGO_DB_NAME}
@@ -58,9 +61,11 @@ services:
     volumes:
       - ./bot:/app
       - /app/node_modules
-      - ./bot/sessions:/app/sessions
+      - ./bot/tokens:/app/tokens  # Para persistencia de sesión
+      - ./bot/sessions:/app/session
     ports:
       - "3001:3001"
+    tty: true  # Mantiene el contenedor activo para ver el QR
     depends_on:
       - backend
     networks:
