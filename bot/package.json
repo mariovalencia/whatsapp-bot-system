@@ -4,11 +4,14 @@
   "description": "WhatsApp Bot for customer service",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "venom-bot": "^4.3.7",
-    "axios": "^1.4.0",
+    "venom-bot": "^5.3.0",
+    "axios": "^1.8.3",
     "dotenv": "^16.3.1"
   }
 }

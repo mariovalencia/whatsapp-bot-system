@@ -57,15 +57,15 @@ services:
       DB_NAME: ${BOT_DB_NAME}
       DB_USER: ${BOT_DB_USER}
       DB_PASSWORD: ${BOT_DB_PASSWORD}
-    command: sh -c "npm install && node index.js"
     volumes:
       - ./bot:/app
       - /app/node_modules
       - ./bot/tokens:/app/tokens  # Para persistencia de sesión
-      - ./bot/sessions:/app/session
+      - ./bot/session:/app/session
     ports:
       - "3001:3001"
     tty: true  # Mantiene el contenedor activo para ver el QR
+    stdin_open: true
     depends_on:
       - backend
     networks:
