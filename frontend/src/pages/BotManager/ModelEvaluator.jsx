@@ -4,7 +4,7 @@ import API from '../../services/api';
 
 const { Paragraph } = Typography;
 
-export default function ModelTrainer({ status, onTrain }) {
+export default function ModelEvaluator() {
   const [visible, setVisible] = useState(false);
   const [report, setReport] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,23 +23,10 @@ export default function ModelTrainer({ status, onTrain }) {
   };
 
   return (
-    <div className="my-4 p-4 bg-gray-100 rounded">
-      <button
-        onClick={onTrain}
-        className="bg-blue-500 text-white px-4 py-2 rounded mr-4"
-      >
-        Entrenar Modelo NLP
-      </button>
-
-      <button
-        onClick={fetchReport}
-        className="bg-gray-600 text-white px-4 py-2 rounded"
-      >
+    <>
+      <Button onClick={fetchReport} type="default">
         Evaluar Modelo NLP
-      </button>
-
-      {status && <p className="mt-2">{status}</p>}
-
+      </Button>
       <Modal
         title="Reporte de Evaluación del Modelo"
         open={visible}
@@ -55,6 +42,6 @@ export default function ModelTrainer({ status, onTrain }) {
           </Paragraph>
         )}
       </Modal>
-    </div>
+    </>
   );
 }

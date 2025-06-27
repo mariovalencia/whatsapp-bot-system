@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework import generics
 from rest_framework.decorators import action
 from .models import Intent, Response
+from .tasks import train_nlp_model
 from .serializers import (
     AskRequestSerializer,
     AskResponseSerializer,
@@ -122,19 +123,19 @@ class IntentUpsertView(APIView):
 class TrainNLPView(APIView):
     def post(self, request):
         try:
-            logger.info("Entrenamiento iniciado")
-            success = nlp_engine.train()
-            logger.info("Entrenamiento completado: %s", success)
+            task = train_nlp_model.delay() # Llama a la tarea en segundo plano
             return JsonResponse({
-                "status": "success" if success else "warning",
-                "message": "Modelo entrenado" if success else "No hay datos suficientes"
+                "status": "pending",
+                "task_id": task.id,
+                "message": "Entrenamiento iniciado en segundo plano"
             })
         except Exception as e:
-            logger.error(f"Error en entrenamiento: {str(e)}", exc_info=True)
+            logger.error(f"Error al iniciar tarea Celery: {str(e)}")
             return JsonResponse({
                 "status": "error",
                 "message": str(e)
             }, status=500)
+
 
 class ResponseListCreateView(generics.ListCreateAPIView):
     queryset = Response.objects.all()
