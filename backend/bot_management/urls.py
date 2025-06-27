@@ -1,5 +1,8 @@
 from django.urls import path
-from .views import AskBotView, IntentManagementView, IntentUpsertView, TrainNLPView, ResponseListCreateView, ResponseRetrieveUpdateDestroyView, SetDefaultResponseView
+from .views import (AskBotView, IntentManagementView, 
+                    IntentUpsertView, TrainNLPView, ResponseListCreateView, 
+                    ResponseRetrieveUpdateDestroyView, SetDefaultResponseView, 
+                    EvaluateModelView)
 
 urlpatterns = [
     path('ask/', AskBotView.as_view(), name='ask_bot'),
@@ -9,4 +12,5 @@ urlpatterns = [
     path('responses/', ResponseListCreateView.as_view(), name='response-list-create'),
     path('responses/<int:pk>/', ResponseRetrieveUpdateDestroyView.as_view(), name='response-detail'),
     path('intents/<int:intent_id>/set-default-response/', SetDefaultResponseView.as_view(), name='set-default-response'),
+    path('evaluate/', EvaluateModelView.as_view(), name='evaluate-model'),
 ]

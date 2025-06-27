@@ -14,6 +14,8 @@ from .nlp_engine import NLPEngine
 from django.http import JsonResponse
 from .exceptions import NLPModelNotTrainedError
 import logging
+import joblib
+import os
 
 logger = logging.getLogger('bot_management')
 
@@ -60,7 +62,8 @@ class AskBotView(APIView):
             )
     
     def _get_response(self, intent, context):
-        # Implementa tu lógica para obtener respuestas
+        if intent.name == "recordar_nombre" and context.get("nombre"):
+            return f"¡Claro, {context['nombre']}! ¿En qué más puedo ayudarte?"
         if not intent:
             logger.debug("No se encontró intención - usando respuesta por defecto")
             return "No entendí tu mensaje. ¿Podrías reformularlo?"
@@ -163,4 +166,23 @@ class SetDefaultResponseView(APIView):
             return DRFResponse(
                 {"error": "Respuesta no encontrada o no pertenece al intent"},
                 status=status.HTTP_404_NOT_FOUND
-            )
+            )     
+            
+class EvaluateModelView(APIView):
+    def get(self, request):
+        from sklearn.model_selection import train_test_split
+        from sklearn.metrics import classification_report
+
+        intents = Intent.objects.filter(is_active=True)
+        texts, labels = [], []
+        for intent in intents:
+            for phrase in intent.training_phrases:
+                texts.append(phrase)
+                labels.append(intent.id)
+
+        X_train, X_test, y_train, y_test = train_test_split(texts, labels, test_size=0.2)
+        nlp_engine.train()  # Reentrenar con todos los datos
+        y_pred = nlp_engine.model.predict(X_test)
+
+        report = classification_report(y_test, y_pred, target_names=list(nlp_engine.label_map.values()))
+        return Response({"report": report})

@@ -53,6 +53,9 @@ class IntentSerializer(serializers.ModelSerializer):
         if not all(isinstance(phrase, str) for phrase in value):
             raise serializers.ValidationError("Todas las frases de entrenamiento deben ser cadenas de texto")
         return value
+        if len(value) != len(set(value)):  # Evitar duplicados
+            raise serializers.ValidationError("Hay frases duplicadas.")
+        return value
 
     def validate_name(self, value):
         # Validación personalizada del nombre
