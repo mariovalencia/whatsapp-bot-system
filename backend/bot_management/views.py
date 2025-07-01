@@ -3,13 +3,14 @@ from rest_framework.response import Response as DRFResponse
 from rest_framework import status
 from rest_framework import generics
 from rest_framework.decorators import action
-from .models import Intent, Response
+from .models import Intent, Response, ConversationLog
 from .tasks import train_nlp_model
 from .serializers import (
     AskRequestSerializer,
     AskResponseSerializer,
     IntentSerializer,
-    ResponseSerializer
+    ResponseSerializer,
+    ConversationLogSerializer
 )
 from .nlp_engine import NLPEngine
 from django.http import JsonResponse
@@ -17,6 +18,8 @@ from .exceptions import NLPModelNotTrainedError
 import logging
 import joblib
 import os
+from celery.result import AsyncResult
+from celery import current_app
 
 logger = logging.getLogger('bot_management')
 
@@ -52,9 +55,19 @@ class AskBotView(APIView):
                 "confidence": float(confidence)
             }
             
+            ConversationLog.objects.create(
+                user_phone=context.get("cliente_id", "desconocido"),
+                message=message,
+                intent=intent,
+                response=response_text
+            )
+            
             logger.info(f"Respuesta generada para mensaje: '{message}'")
             return DRFResponse(response_data)
             
+            
+            
+
         except Exception as e:
             logger.error(f"Error procesando mensaje: {str(e)}", exc_info=True)
             return DRFResponse(
@@ -187,3 +200,23 @@ class EvaluateModelView(APIView):
 
         report = classification_report(y_test, y_pred, target_names=list(nlp_engine.label_map.values()))
         return Response({"report": report})
+    
+    
+class TaskStatusView(APIView):
+    def get(self, request, task_id):
+        result = AsyncResult(task_id, app=current_app)
+        return JsonResponse({
+            "task_id": task_id,
+            "status": result.status,
+            "result": result.result if result.ready else None
+        })
+        
+
+class ConversationLogListView(generics.ListAPIView):
+    serializer_class = ConversationLogSerializer
+
+    def get_queryset(self):
+        phone = self.request.query_params.get('user_phone')
+        if phone:
+            return ConversationLog.objects.filter(user_phone=phone).order_by('-timestamp')
+        return ConversationLog.objects.none()

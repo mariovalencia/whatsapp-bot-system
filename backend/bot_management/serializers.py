@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Intent, Response
+from .models import Intent, Response, ConversationLog
 
 # Para el modelo Response
 class ResponseSerializer(serializers.ModelSerializer):
@@ -73,3 +73,11 @@ class AskResponseSerializer(serializers.Serializer):
     intent = IntentSerializer(required=False)
     response = serializers.CharField()
     confidence = serializers.FloatField(default=0.0)
+    
+
+class ConversationLogSerializer(serializers.ModelSerializer):
+    intent_name = serializers.CharField(source='intent.name', read_only=True)
+
+    class Meta:
+        model = ConversationLog
+        fields = ['id', 'user_phone', 'message', 'intent', 'intent_name', 'response', 'timestamp']

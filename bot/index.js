@@ -3,6 +3,7 @@ const axios = require("axios");
 const fs = require('fs');
 const path = require('path');
 const { setTimeout } = require('timers/promises');
+const handleMessage = require('./handlers/messageHandlers');
 
 async function cleanSession() {
   const sessionPath = path.join(__dirname, 'tokens');
@@ -89,12 +90,12 @@ function start(client) {
         
     if (!userSessions[userId]) {
       userSessions[userId] = { step: 1, data: {} };
-      client.sendText(userId, "👋 Hola, bienvenido al sistema de atención al cliente, ¿En que te podemos ayudar?");
+      client.sendText(userId, "👋 Hola, bienvenido al sistema de atención al cliente, ¿Con quien tengo el gusto?");
       return;
     }
     
     const session = userSessions[userId];
-    // ... resto de tu lógica de mensajes
+      await handleMessage(message, client);
   });
 }
 

@@ -35,3 +35,15 @@ class Response(models.Model):
 
     def __str__(self):
         return f"Respuesta para {self.intent.name} ({'default' if self.is_default else 'personalizada'})"
+    
+
+class ConversationLog(models.Model):
+    user_phone = models.CharField(max_length=20, help_text="Número de teléfono del usuario")
+    message = models.TextField(help_text="Mensaje recibido del usuario")
+    intent = models.ForeignKey('Intent', null=True, blank=True, on_delete=models.SET_NULL, help_text="Intención detectada")
+    response = models.TextField(help_text="Respuesta generada por el bot")
+    timestamp = models.DateTimeField(auto_now_add=True, help_text="Fecha y hora del mensaje")
+
+    def __str__(self):
+        return f"[{self.timestamp}] {self.user_phone}: {self.message[:30]}..."
+    

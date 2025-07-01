@@ -1,60 +1,72 @@
-import { useState } from 'react';
-import { Button, Modal, Typography, Spin, message } from 'antd';
+import { useState, useEffect } from 'react';
+import { Button, message, Spin } from 'antd';
 import API from '../../services/api';
 
-const { Paragraph } = Typography;
-
 export default function ModelTrainer({ status, onTrain }) {
-  const [visible, setVisible] = useState(false);
-  const [report, setReport] = useState('');
+  const [taskId, setTaskId] = useState(null);
+  const [taskStatus, setTaskStatus] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const fetchReport = async () => {
+  const startTraining = async () => {
     setLoading(true);
     try {
-      const res = await API.get('/evaluate/');
-      setReport(res.data.report);
-      setVisible(true);
+      const res = await API.post('/train/');
+      setTaskId(res.data.task_id);
+      setTaskStatus('PENDING');
+      message.info('🚀 Entrenamiento iniciado...');
     } catch (error) {
-      message.error('Error al obtener el reporte del modelo');
+      message.error('❌ Error al iniciar entrenamiento');
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    if (!taskId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await API.get(`/task-status/${taskId}/`);
+        setTaskStatus(res.data.status);
+
+        if (res.data.status === 'SUCCESS') {
+          clearInterval(interval);
+          const result = res.data.result;
+          if (result?.status === 'warning') {
+            message.warning(`⚠️ Entrenamiento finalizado con advertencias: ${result.message}`);
+          } else {
+            message.success(`✅ Entrenamiento exitoso: ${result.message}`);
+          }
+        }
+
+        if (res.data.status === 'FAILURE') {
+          clearInterval(interval);
+          message.error('❌ El entrenamiento falló. Revisa los logs del backend.');
+        }
+      } catch {
+        clearInterval(interval);
+        message.error('❌ Error al consultar estado de la tarea');
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [taskId]);
+
   return (
     <div className="my-4 p-4 bg-gray-100 rounded">
-      <button
-        onClick={onTrain}
+      <Button
+        onClick={startTraining}
         className="bg-blue-500 text-white px-4 py-2 rounded mr-4"
+        loading={loading}
       >
         Entrenar Modelo NLP
-      </button>
+      </Button>
 
-      <button
-        onClick={fetchReport}
-        className="bg-gray-600 text-white px-4 py-2 rounded"
-      >
-        Evaluar Modelo NLP
-      </button>
-
-      {status && <p className="mt-2">{status}</p>}
-
-      <Modal
-        title="Reporte de Evaluación del Modelo"
-        open={visible}
-        onCancel={() => setVisible(false)}
-        footer={null}
-        width={800}
-      >
-        {loading ? (
-          <Spin />
-        ) : (
-          <Paragraph style={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-            {report}
-          </Paragraph>
-        )}
-      </Modal>
+      {taskStatus && (
+        <p className="mt-2">
+          Estado de la tarea: <strong>{taskStatus}</strong>
+        </p>
+      )}
     </div>
   );
 }
