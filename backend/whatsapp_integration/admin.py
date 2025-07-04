@@ -1,4 +1,4 @@
 from django.contrib import admin
-from .models import WhatsAppMessage
+from .models import ExternalMessageLog
 
-admin.site.register(WhatsAppMessage)
+admin.site.register(ExternalMessageLog)
