@@ -43,13 +43,13 @@ class WhatsAppWebhookView(APIView):
         
         return Response({"response": response_text}, status=status.HTTP_200_OK)
     
-    def get_qr(request):
-        try:
-            with open('bot/qr.txt', 'r') as f:
-                qr_data = f.read()
-            return JsonResponse({'qr': qr_data})
-        except FileNotFoundError:
-            return JsonResponse({'error': 'QR no generado'}, status=404)
+def get_qr(request):
+    try:
+        with open('bot/qr.txt', 'r') as f:
+            qr_data = f.read()
+        return JsonResponse({'qr': qr_data})
+    except FileNotFoundError:
+        return JsonResponse({'error': 'QR no generado'}, status=404)
         
 
 class ERPCreateTicketView(APIView):
